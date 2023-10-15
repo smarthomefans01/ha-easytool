@@ -7,6 +7,7 @@ echo "2. smarthomefansbox-m"
 echo "3. smarthomefansbox-super"
 echo "4. smarthomefansbox-max"
 echo "5. smarthomefansbox-supreme"
+echo "6. smarthomefansbox-easy"
 read -p "请输入对应数字：" hostname_number
 case $hostname_number in
   1) new_hostname="smarthomefansbox" ;;
@@ -14,6 +15,7 @@ case $hostname_number in
   3) new_hostname="smarthomefansbox-super" ;;
   4) new_hostname="smarthomefansbox-max" ;;
   5) new_hostname="smarthomefansbox-supreme" ;;
+  6) new_hostname="smarthomefansbox-easy" ;;
   *) echo "输入有误！" exit 1 ;;
 esac
 echo "当前hostname为$(hostname)，新的hostname为$new_hostname。"
