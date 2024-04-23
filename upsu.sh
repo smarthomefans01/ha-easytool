@@ -5,6 +5,33 @@
 # ==============================================================================
 set -e
 
+systemctl stop hassio-supervisor.service
+systemctl stop hassio-apparmor.service
+echo "已停止 Supervisor 服务."
+
+systemctl disable hassio-supervisor.service
+systemctl disable hassio-apparmor.service
+echo "已禁止 Supervisor 自动启动."
+
+echo "检查并停止/删除 hassio_supervisor 容器"
+read -p "继续操作吗？(y/n): " confirm
+if [[ $confirm != "y" && $confirm != "Y" ]]; then
+    echo "已取消操作."
+    exit 0
+fi
+if docker ps -a --format "{{.Names}}" | grep -q "hassio_supervisor"; then
+    echo "停止 hassio_supervisor 容器..."
+    docker stop hassio_supervisor
+    echo "已停止 hassio_supervisor 容器."
+    
+    echo "删除 hassio_supervisor 容器..."
+    docker rm hassio_supervisor
+    echo "已删除 hassio_supervisor 容器."
+else
+    echo "hassio_supervisor 容器未找到，无需操作."
+fi
+
+
 # Define the Docker daemon configuration file path
 DAEMON_JSON_FILE="/etc/docker/daemon.json"
 
@@ -135,6 +162,15 @@ fi
 
 # Run supervisor
 mkdir -p ${SUPERVISOR_DATA}
+
+systemctl start hassio-supervisor.service
+systemctl start hassio-apparmor.service
+echo "已启动加载的镜像."
+
+systemctl enable hassio-supervisor.service
+systemctl enable hassio-apparmor.service
+echo "已启用自动重启服务."
+
 echo "[INFO] Starting the Supervisor..."
 docker container start hassio_supervisor
 exec docker container wait hassio_supervisor
