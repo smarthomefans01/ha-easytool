@@ -48,8 +48,6 @@ if [ -f "$DAEMON_JSON_FILE" ]; then
         "tag": "{{.Name}}"
     },
     "registry-mirrors": [
-        "https://dockerproxy.com",
-        "https://docker.m.daocloud.io",
         "https://docker.nju.edu.cn"
     ]
 }
@@ -153,7 +151,7 @@ if [ -z "${SUPERVISOR_CONTAINER_ID}" ]; then
         -e SUPERVISOR_SHARE=${SUPERVISOR_DATA} \
         -e SUPERVISOR_NAME=hassio_supervisor \
         -e SUPERVISOR_MACHINE=${SUPERVISOR_MACHINE} \
-        "${SUPERVISOR_IMAGE}:latest"
+        ghcr.io/home-assistant/aarch64-hassio-supervisor:latest
 
     # Store the timestamp of this script. If the script changed, let's
     # recreate the container automatically.
