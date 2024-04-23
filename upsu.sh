@@ -5,37 +5,6 @@
 # ==============================================================================
 set -e
 
-# Define the Docker daemon configuration file path
-DAEMON_JSON_FILE="/etc/docker/daemon.json"
-
-# Read the existing daemon.json file and add the registry-mirrors key
-if [ -f "$DAEMON_JSON_FILE" ]; then
-    # Add the registry-mirrors key with the desired mirror URLs
-    cat <<EOF > "$DAEMON_JSON_FILE"
-{
-    "log-driver": "journald",
-    "storage-driver": "overlay2",
-    "ip6tables": true,
-    "experimental": true,
-    "log-opts": {
-        "tag": "{{.Name}}"
-    },
-    "registry-mirrors": [
-        "https://dockerproxy.com",
-        "https://docker.m.daocloud.io",
-        "https://docker.nju.edu.cn"
-    ]
-}
-EOF
-
-    echo "Chinese Docker registry mirrors added to $DAEMON_JSON_FILE"
-else
-    echo "Error: $DAEMON_JSON_FILE does not exist."
-fi
-
-# Restart the Docker service to apply the changes
-sudo systemctl restart docker
-
 # Load configs
 CONFIG_FILE=/etc/hassio.json
 
