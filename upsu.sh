@@ -1,67 +1,11 @@
 #!/bin/sh
 # shellcheck disable=SC1091
 # ==============================================================================
-# Supervisor Docker container with Chinese Docker registry mirrors configuration
+# Supervisor Docker container
 # ==============================================================================
 set -e
 
-systemctl stop hassio-supervisor.service
-systemctl stop hassio-apparmor.service
-echo "已停止 Supervisor 服务."
-
-systemctl disable hassio-supervisor.service
-systemctl disable hassio-apparmor.service
-echo "已禁止 Supervisor 自动启动."
-
-echo "检查并停止/删除 hassio_supervisor 容器"
-read -p "继续操作吗？(y/n): " confirm
-if [[ $confirm != "y" && $confirm != "Y" ]]; then
-    echo "已取消操作."
-    exit 0
-fi
-if docker ps -a --format "{{.Names}}" | grep -q "hassio_supervisor"; then
-    echo "停止 hassio_supervisor 容器..."
-    docker stop hassio_supervisor
-    echo "已停止 hassio_supervisor 容器."
-    
-    echo "删除 hassio_supervisor 容器..."
-    docker rm hassio_supervisor
-    echo "已删除 hassio_supervisor 容器."
-else
-    echo "hassio_supervisor 容器未找到，无需操作."
-fi
-
-
-# Define the Docker daemon configuration file path
-DAEMON_JSON_FILE="/etc/docker/daemon.json"
-
-# Read the existing daemon.json file and add the registry-mirrors key
-if [ -f "$DAEMON_JSON_FILE" ]; then
-    # Add the registry-mirrors key with the desired mirror URLs
-    cat <<EOF > "$DAEMON_JSON_FILE"
-{
-    "log-driver": "journald",
-    "storage-driver": "overlay2",
-    "ip6tables": true,
-    "experimental": true,
-    "log-opts": {
-        "tag": "{{.Name}}"
-    },
-    "registry-mirrors": [
-        "https://docker.nju.edu.cn"
-    ]
-}
-EOF
-
-    echo "Chinese Docker registry mirrors added to $DAEMON_JSON_FILE"
-else
-    echo "Error: $DAEMON_JSON_FILE does not exist."
-fi
-
-# Restart the Docker service to apply the changes
-sudo systemctl restart docker
-
-# Load configs for Supervisor
+# Load configs
 CONFIG_FILE=/etc/hassio.json
 
 # Init supervisor
@@ -69,7 +13,7 @@ SUPERVISOR_DATA="$(jq --raw-output '.data // "/usr/share/hassio"' ${CONFIG_FILE}
 SUPERVISOR_STARTUP_MARKER="/run/supervisor/startup-marker"
 SUPERVISOR_STARTSCRIPT_VERSION="${SUPERVISOR_DATA}/supervisor-version"
 SUPERVISOR_MACHINE="$(jq --raw-output '.machine' ${CONFIG_FILE})"
-SUPERVISOR_IMAGE="smarthomefansbox/aarch64-hassio-supervisor"
+SUPERVISOR_IMAGE="$(jq --raw-output '.supervisor' ${CONFIG_FILE})"
 
 SUPERVISOR_IMAGE_ID=$(docker images --no-trunc --filter "reference=${SUPERVISOR_IMAGE}:latest" --format "{{.ID}}" || echo "")
 SUPERVISOR_CONTAINER_ID=$(docker inspect --format='{{.Image}}' hassio_supervisor || echo "")
@@ -102,19 +46,15 @@ if [ -z "${SUPERVISOR_IMAGE_ID}" ]; then
     if docker pull "${SUPERVISOR_IMAGE}:${SUPERVISOR_VERSION}"; then
         # Tag as latest if versioned
         if [ "${SUPERVISOR_VERSION}" != "latest" ]; then
-            docker tag "${SUPERVISOR_IMAGE}:${SUPERVISOR_VERSION}" "ghcr.io/home-assistant/aarch64-hassio-supervisor:${SUPERVISOR_VERSION}"
-            # Also tag as ghcr.io's latest
-            docker tag "${SUPERVISOR_IMAGE}:${SUPERVISOR_VERSION}" "ghcr.io/home-assistant/aarch64-hassio-supervisor:latest"
+            docker tag "${SUPERVISOR_IMAGE}:${SUPERVISOR_VERSION}" "${SUPERVISOR_IMAGE}:latest"
         fi
     else
         # Pull failed, updater info might be corrupted, re-trying with latest
         echo "[WARNING] Supervisor downloading failed trying: latest"
-        if docker pull "${SUPERVISOR_IMAGE}:latest"; then
-            docker tag "${SUPERVISOR_IMAGE}:latest" "ghcr.io/home-assistant/aarch64-hassio-supervisor:latest"
-        fi
+        docker pull "${SUPERVISOR_IMAGE}:latest"
     fi
 
-    SUPERVISOR_IMAGE_ID=$(docker inspect --format='{{.Id}}' "ghcr.io/home-assistant/aarch64-hassio-supervisor" || echo "")
+    SUPERVISOR_IMAGE_ID=$(docker inspect --format='{{.Id}}' "${SUPERVISOR_IMAGE}" || echo "")
 fi
 
 if [ -n "${SUPERVISOR_CONTAINER_ID}" ]; then
@@ -151,7 +91,7 @@ if [ -z "${SUPERVISOR_CONTAINER_ID}" ]; then
         -e SUPERVISOR_SHARE=${SUPERVISOR_DATA} \
         -e SUPERVISOR_NAME=hassio_supervisor \
         -e SUPERVISOR_MACHINE=${SUPERVISOR_MACHINE} \
-        ghcr.io/home-assistant/aarch64-hassio-supervisor:latest
+        "${SUPERVISOR_IMAGE}:latest"
 
     # Store the timestamp of this script. If the script changed, let's
     # recreate the container automatically.
@@ -160,15 +100,6 @@ fi
 
 # Run supervisor
 mkdir -p ${SUPERVISOR_DATA}
-
-systemctl start hassio-supervisor.service
-systemctl start hassio-apparmor.service
-echo "已启动加载的镜像."
-
-systemctl enable hassio-supervisor.service
-systemctl enable hassio-apparmor.service
-echo "已启用自动重启服务."
-
 echo "[INFO] Starting the Supervisor..."
 docker container start hassio_supervisor
 exec docker container wait hassio_supervisor
